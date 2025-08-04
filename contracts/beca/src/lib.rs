@@ -6,6 +6,7 @@ use soroban_sdk::{
 };
 
 // --- 1. ON-CHAIN DATA STRUCTURES AND TYPES ---
+
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub enum MilestoneStatus {
@@ -18,26 +19,22 @@ pub enum MilestoneStatus {
 #[derive(Clone)]
 pub struct Milestone {
     pub name: String,
+    pub description: String, // <-- DESCRIÇÃO ADICIONADA AQUI
     pub status: MilestoneStatus,
-    pub approvers: Vec<Address>, // Stores addresses that have approved (multisig)
-    pub paid: bool, // Flag to ensure payment is claimed only once
+    pub approvers: Vec<Address>,
+    pub paid: bool,
 }
 
 #[contracttype]
 #[derive(Clone)]
 pub struct Grant {
-    // Roles
     pub manager: Address,
     pub supervisor: Address,
     pub researcher: Address,
-
-    // Financial Data
-    pub funder: Address, // The entity that funds and transfers the amount
+    pub funder: Address,
     pub total_amount: i128,
     pub claimed_amount: i128,
-
-    // Metadata and Flow Control
-    pub name: String, // Short on-chain name
+    pub name: String,
     pub total_milestones: u32,
     pub registered_milestones: u32,
     pub creation_timestamp: u64,
@@ -49,8 +46,10 @@ pub enum StorageKey {
     TokenAddress,
     NextGrantId,
     Grants,
-    Milestones, 
+    Milestones,
 }
+
+// --- 2. PUBLIC CONTRACT INTERFACE (TRAIT) ---
 
 pub trait GrantContractTrait {
     fn initialize(env: Env, token_address: Address);
@@ -64,19 +63,29 @@ pub trait GrantContractTrait {
         total_amount: i128,
         total_milestones: u32,
     ) -> u64;
-    fn register_milestone(env: Env, manager: Address, grant_id: u64, name: String) -> u32;
+
+    // A assinatura da função foi atualizada para aceitar uma descrição
+    fn register_milestone(
+        env: Env,
+        manager: Address,
+        grant_id: u64,
+        name: String,
+        description: String,
+    ) -> u32;
+
     fn approve_milestone(env: Env, signer: Address, grant_id: u64, milestone_id: u32);
     fn claim_payment(env: Env, claimer: Address, grant_id: u64, milestone_id: u32);
     fn get_grant(env: Env, id: u64) -> Grant;
     fn get_milestone(env: Env, grant_id: u64, milestone_id: u32) -> Milestone;
 }
 
+// --- 3. CONTRACT STRUCT AND IMPLEMENTATION ---
+
 #[contract]
 pub struct GrantContract;
 
 #[contractimpl]
 impl GrantContractTrait for GrantContract {
-
     fn initialize(env: Env, token_address: Address) {
         if env.storage().instance().has(&symbol_short!("init")) {
             panic!("Contract already initialized");
@@ -85,16 +94,7 @@ impl GrantContractTrait for GrantContract {
         env.storage().instance().set(&StorageKey::TokenAddress, &token_address);
     }
     
-    fn create_grant(
-        env: Env,
-        funder: Address,
-        manager: Address,
-        supervisor: Address,
-        researcher: Address,
-        name: String,
-        total_amount: i128,
-        total_milestones: u32,
-    ) -> u64 {
+    fn create_grant(/*...arguments...*/env: Env, funder: Address, manager: Address, supervisor: Address, researcher: Address, name: String, total_amount: i128, total_milestones: u32) -> u64 {
         funder.require_auth();
 
         if total_amount <= 0 || total_milestones == 0 {
@@ -125,7 +125,8 @@ impl GrantContractTrait for GrantContract {
         grant_id
     }
     
-    fn register_milestone(env: Env, manager: Address, grant_id: u64, name: String) -> u32 {
+    // Implementação atualizada para usar a descrição
+    fn register_milestone(env: Env, manager: Address, grant_id: u64, name: String, description: String) -> u32 {
         manager.require_auth();
         
         let mut grant = Self::get_grant(env.clone(), grant_id);
@@ -141,6 +142,7 @@ impl GrantContractTrait for GrantContract {
         
         let new_milestone = Milestone {
             name,
+            description, // Descrição é salva aqui
             status: MilestoneStatus::Pending,
             approvers: Vec::new(&env),
             paid: false,
@@ -158,70 +160,55 @@ impl GrantContractTrait for GrantContract {
         milestone_id
     }
     
-    fn approve_milestone(env: Env, signer: Address, grant_id: u64, milestone_id: u32) {
+    fn approve_milestone(/*...arguments...*/ env: Env, signer: Address, grant_id: u64, milestone_id: u32) {
         signer.require_auth();
-
         let grant = Self::get_grant(env.clone(), grant_id);
-        
         if signer != grant.manager && signer != grant.supervisor && signer != grant.researcher {
             panic!("Only grant participants can approve");
         }
-
         let mut milestone = Self::get_milestone(env.clone(), grant_id, milestone_id);
-        
         if milestone.status != MilestoneStatus::Pending {
             panic!("Milestone is not pending approval");
         }
         if milestone.approvers.contains(&signer) {
             panic!("Signer has already approved this milestone");
         }
-
         milestone.approvers.push_back(signer);
-
         if milestone.approvers.len() == 3 {
             milestone.status = MilestoneStatus::Approved;
         }
-
         let mut milestones_map: Map<(u64, u32), Milestone> = env.storage().instance().get(&StorageKey::Milestones).unwrap();
         milestones_map.set((grant_id, milestone_id), milestone);
         env.storage().instance().set(&StorageKey::Milestones, &milestones_map);
     }
 
-    fn claim_payment(env: Env, claimer: Address, grant_id: u64, milestone_id: u32) {
+    fn claim_payment(/*...arguments...*/ env: Env, claimer: Address, grant_id: u64, milestone_id: u32) {
         claimer.require_auth();
-
         let mut grant = Self::get_grant(env.clone(), grant_id);
-        
         if claimer != grant.manager && claimer != grant.supervisor && claimer != grant.researcher {
             panic!("Only grant participants can claim payment");
         }
-
         let mut milestone = Self::get_milestone(env.clone(), grant_id, milestone_id);
-        
         if milestone.status != MilestoneStatus::Approved {
             panic!("Milestone is not approved");
         }
         if milestone.paid {
             panic!("Payment for this milestone has already been claimed");
         }
-        
         let payment_amount = grant.total_amount / (grant.total_milestones as i128);
-        
         let token_address: Address = env.storage().instance().get(&StorageKey::TokenAddress).unwrap();
         let token = token::Client::new(&env, &token_address);
         token.transfer(&env.current_contract_address(), &grant.researcher, &payment_amount);
-
         milestone.paid = true;
         let mut milestones_map: Map<(u64, u32), Milestone> = env.storage().instance().get(&StorageKey::Milestones).unwrap();
         milestones_map.set((grant_id, milestone_id), milestone);
         env.storage().instance().set(&StorageKey::Milestones, &milestones_map);
-
         grant.claimed_amount += payment_amount;
         let mut grants_map: Map<u64, Grant> = env.storage().instance().get(&StorageKey::Grants).unwrap();
         grants_map.set(grant_id, grant);
         env.storage().instance().set(&StorageKey::Grants, &grants_map);
     }
-    
+        
     fn get_grant(env: Env, id: u64) -> Grant {
         let grants: Map<u64, Grant> = env.storage().instance().get(&StorageKey::Grants).unwrap();
         grants.get(id).unwrap()
