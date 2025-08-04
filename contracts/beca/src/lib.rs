@@ -5,8 +5,6 @@ use soroban_sdk::{
     Address, Env, Map, String, Vec,
 };
 
-// --- 1. ON-CHAIN DATA STRUCTURES AND TYPES ---
-
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub enum MilestoneStatus {
@@ -19,7 +17,7 @@ pub enum MilestoneStatus {
 #[derive(Clone)]
 pub struct Milestone {
     pub name: String,
-    pub description: String, // <-- DESCRIÇÃO ADICIONADA AQUI
+    pub description: String, 
     pub status: MilestoneStatus,
     pub approvers: Vec<Address>,
     pub paid: bool,
@@ -49,8 +47,6 @@ pub enum StorageKey {
     Milestones,
 }
 
-// --- 2. PUBLIC CONTRACT INTERFACE (TRAIT) ---
-
 pub trait GrantContractTrait {
     fn initialize(env: Env, token_address: Address);
     fn create_grant(
@@ -64,7 +60,6 @@ pub trait GrantContractTrait {
         total_milestones: u32,
     ) -> u64;
 
-    // A assinatura da função foi atualizada para aceitar uma descrição
     fn register_milestone(
         env: Env,
         manager: Address,
@@ -79,7 +74,6 @@ pub trait GrantContractTrait {
     fn get_milestone(env: Env, grant_id: u64, milestone_id: u32) -> Milestone;
 }
 
-// --- 3. CONTRACT STRUCT AND IMPLEMENTATION ---
 
 #[contract]
 pub struct GrantContract;
@@ -125,7 +119,6 @@ impl GrantContractTrait for GrantContract {
         grant_id
     }
     
-    // Implementação atualizada para usar a descrição
     fn register_milestone(env: Env, manager: Address, grant_id: u64, name: String, description: String) -> u32 {
         manager.require_auth();
         
@@ -142,7 +135,7 @@ impl GrantContractTrait for GrantContract {
         
         let new_milestone = Milestone {
             name,
-            description, // Descrição é salva aqui
+            description, 
             status: MilestoneStatus::Pending,
             approvers: Vec::new(&env),
             paid: false,

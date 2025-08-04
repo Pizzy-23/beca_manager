@@ -6,7 +6,6 @@ use soroban_sdk::testutils::Address as _;
 use soroban_sdk::token::{Client as TokenClient, StellarAssetClient};
 use soroban_sdk::{Address, Env, String};
 
-// A função `setup_test_env` continua a mesma
 fn setup_test_env<'a>() -> (Env, GrantContractClient<'a>, TokenClient<'a>, StellarAssetClient<'a>, Address, Address, Address, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
@@ -25,7 +24,6 @@ fn setup_test_env<'a>() -> (Env, GrantContractClient<'a>, TokenClient<'a>, Stell
 
 #[test]
 fn test_create_grant_successfully() {
-    // Este teste não é afetado pela mudança e continua igual.
     let (_, client, token_client, token_admin_client, contract_id, funder, manager, supervisor, researcher) = setup_test_env();
     let total_amount = 1_000_000_000;
     let grant_name = String::from_str(&client.env, "Climate Research Grant");
@@ -60,7 +58,6 @@ fn test_full_flow_one_milestone() {
     
     let milestone_data = client.get_milestone(&grant_id, &milestone_id);
     assert_eq!(milestone_data.status, MilestoneStatus::Approved);
-    // Adiciona verificação para a descrição
     assert_eq!(milestone_data.description, milestone_desc);
     
     let researcher_balance_before = token_client.balance(&researcher);
@@ -90,7 +87,6 @@ fn test_fails_on_claiming_payment_twice() {
     token_client.approve(&funder, &contract_id, &amount, &100);
     let grant_id = client.create_grant(&funder, &manager, &supervisor, &researcher, &String::from_str(&client.env, "Double Payment Test"), &amount, &1);
     
-    // Atualizado para incluir a descrição
     let milestone_id = client.register_milestone(
         &manager,
         &grant_id,
