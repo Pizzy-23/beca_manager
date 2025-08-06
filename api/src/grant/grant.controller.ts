@@ -15,12 +15,9 @@ import { ClaimPaymentDto } from './dto/claim-payment.dto';
 import { ApproveMilestoneDto } from './dto/approve-milestone.dto';
 import { RegisterMilestoneDto } from './dto/register-milestone.dto';
 
-// @ApiTags agrupa todas as rotas deste controller no Swagger
 @ApiTags('Grants')
-// @Controller('grants') define o prefixo base da rota: /grants
 @Controller('grants')
 export class GrantController {
-  // O GrantService é injetado automaticamente pelo NestJS
   constructor(private readonly grantService: GrantService) {}
 
   @Get(':grantId')
@@ -37,14 +34,13 @@ export class GrantController {
   @ApiResponse({ status: 404, description: 'Milestone or grant not found.' })
   public async getMilestoneDetails(
     @Param('grantId') grantId: string,
-    // ParseIntPipe converte e valida o parâmetro da rota para um número
     @Param('milestoneId', ParseIntPipe) milestoneId: number,
   ): Promise<any> {
     return this.grantService.getFullMilestoneDetails(BigInt(grantId), milestoneId);
   }
 
   @Post('build/create')
-  @HttpCode(HttpStatus.CREATED) // Define o status HTTP de sucesso como 201
+  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a grant off-chain and build the on-chain transaction XDR' })
   @ApiResponse({ status: 201, description: 'Grant created and transaction XDR returned.' })
   @ApiBody({ type: CreateGrantDto })
